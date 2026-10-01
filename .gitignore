@@ -141,3 +141,7 @@ vite.config.ts.timestamp-*
 # Backup files
 *~
 *.bak
+
+# Python
+__pycache__/
+*.pyc
