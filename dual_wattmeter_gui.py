@@ -1,5 +1,7 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import ttk, scrolledtext, messagebox, filedialog
+import csv
+import datetime
 import serial
 import serial.tools.list_ports
 import socket
@@ -202,33 +204,63 @@ class ConnectionHandler:
 class DualPortGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("ISW8001 Dual Wattmeter Profiler (Serial & Ethernet WIZ750SR)")
-        self.root.geometry("1140x820")
+        self.root.title("AC/DC Charger Power & Efficiency Analyzer (ISW8001 Dual Profiler)")
+        self.root.geometry("1160x860")
         
         style = ttk.Style()
         style.theme_use('clam')
         
-        # --- Top Efficiency Banner ---
+        # --- Top Efficiency & Context Banner ---
         eff_frame = tk.Frame(root, bg="#2C3E50", bd=5, relief=tk.RAISED)
         eff_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+
+        title_label = tk.Label(eff_frame, text="Laboratory AC/DC Battery Charger Efficiency Testbench",
+                               font=("Arial", 11, "bold"), fg="#BDC3C7", bg="#2C3E50")
+        title_label.pack(pady=(4, 0))
         
-        self.var_efficiency = tk.StringVar(value="System Efficiency (P2 / P1) : --- %")
+        self.var_efficiency = tk.StringVar(value="System Efficiency (P2 DC-Out / P1 AC-In) : --- %")
         tk.Label(eff_frame, textvariable=self.var_efficiency, 
-                 font=("Consolas", 20, "bold"), fg="#F1C40F", bg="#2C3E50", pady=10).pack()
+                 font=("Consolas", 18, "bold"), fg="#F1C40F", bg="#2C3E50", pady=4).pack()
+
+        # CSV Logging Toolbar
+        csv_bar = tk.Frame(root, bg="#1E272C", bd=2, relief=tk.GROOVE)
+        csv_bar.pack(fill=tk.X, padx=10, pady=2)
+        
+        self.is_logging = False
+        self.log_file = None
+        self.csv_writer = None
+        self.log_records_count = 0
+        self.log_status_var = tk.StringVar(value="CSV Logging: Stopped")
+        self.log_records_var = tk.StringVar(value="0 rows recorded")
+
+        self.btn_log = ttk.Button(csv_bar, text="▶ Start CSV Recording", command=self.toggle_logging)
+        self.btn_log.pack(side=tk.LEFT, padx=10, pady=4)
+        
+        btn_export = ttk.Button(csv_bar, text="💾 Save Snapshot to CSV", command=self.export_snapshot_csv)
+        btn_export.pack(side=tk.LEFT, padx=5, pady=4)
+
+        tk.Label(csv_bar, textvariable=self.log_status_var, font=("Arial", 10, "bold"),
+                 fg="#00FF9D", bg="#1E272C").pack(side=tk.LEFT, padx=15)
+        tk.Label(csv_bar, textvariable=self.log_records_var, font=("Consolas", 10),
+                 fg="#BDC3C7", bg="#1E272C").pack(side=tk.LEFT, padx=5)
 
         # --- Main Split Layout ---
         main_frame = tk.Frame(root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        self.frame1 = tk.LabelFrame(main_frame, text="Port 1 (Input)", font=("Arial", 12, "bold"), padx=10, pady=10)
+        self.frame1 = tk.LabelFrame(main_frame, text="Port 1: AC Mains Input (P_in)", font=("Arial", 12, "bold"), padx=10, pady=10)
         self.frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
-        self.frame2 = tk.LabelFrame(main_frame, text="Port 2 (Output)", font=("Arial", 12, "bold"), padx=10, pady=10)
+        self.frame2 = tk.LabelFrame(main_frame, text="Port 2: DC Charger Output (P_out)", font=("Arial", 12, "bold"), padx=10, pady=10)
         self.frame2.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
         self.handlers = {1: None, 2: None}
         self.data_history = {1: collections.deque(maxlen=100), 2: collections.deque(maxlen=100)}
         self.latest_power = {1: 0.0, 2: 0.0}
+        self.latest_metrics = {
+            1: {"v": None, "i": None, "p": None, "pf": None, "var": None},
+            2: {"v": None, "i": None, "p": None, "pf": None, "var": None}
+        }
 
         self.setup_port_ui(self.frame1, 1)
         self.setup_port_ui(self.frame2, 2)
@@ -434,32 +466,38 @@ class DualPortGUI:
         if v_match:
             try:
                 val = float(v_match.group(1))
+                self.latest_metrics[port_id]["v"] = val
                 getattr(self, f"var_v_{port_id}").set(f"{val:.2f} V")
             except: pass
             
         if i_match:
             try:
                 val = float(i_match.group(1))
+                self.latest_metrics[port_id]["i"] = val
                 getattr(self, f"var_i_{port_id}").set(f"{val:.3f} A")
             except: pass
             
         if w_match:
             try:
                 val = float(w_match.group(1))
+                self.latest_metrics[port_id]["p"] = val
                 getattr(self, f"var_w_{port_id}").set(f"{val:.2f} W")
                 self.data_history[port_id].append(val)
                 self.latest_power[port_id] = val
                 self.update_efficiency()
+                self._record_csv_row()
             except: pass
         elif var_match:
             try:
                 val = float(var_match.group(1))
+                self.latest_metrics[port_id]["var"] = val
                 getattr(self, f"var_w_{port_id}").set(f"{val:.2f} VAR")
                 self.data_history[port_id].append(val)
             except: pass
         elif pf_match:
             try:
                 val = float(pf_match.group(1))
+                self.latest_metrics[port_id]["pf"] = val
                 getattr(self, f"var_w_{port_id}").set(f"{val:.3f} PF")
                 self.data_history[port_id].append(val)
             except: pass
@@ -472,9 +510,112 @@ class DualPortGUI:
         
         if p1 > 0 and p2 >= 0:
             eff = (p2 / p1) * 100.0
-            self.var_efficiency.set(f"System Efficiency (P2 / P1) : {eff:.2f} %")
+            loss = p1 - p2
+            self.var_efficiency.set(
+                f"Charger Efficiency: {eff:.2f}%  |  Losses: {loss:.2f}W  (P_in AC: {p1:.2f}W ➔ P_out DC: {p2:.2f}W)"
+            )
         else:
-            self.var_efficiency.set("System Efficiency (P2 / P1) : --- %")
+            self.var_efficiency.set("Charger Efficiency: ---%  (Waiting for P_in and P_out measurements)")
+
+    def toggle_logging(self):
+        if not self.is_logging:
+            timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_name = f"charger_test_{timestamp_str}.csv"
+            filepath = filedialog.asksaveasfilename(
+                title="Select CSV Log File",
+                initialfile=default_name,
+                defaultextension=".csv",
+                filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+            )
+            if not filepath:
+                return
+            try:
+                self.log_file = open(filepath, "w", newline="", encoding="utf-8")
+                self.csv_writer = csv.writer(self.log_file)
+                self.csv_writer.writerow([
+                    "timestamp_iso", "timestamp_epoch",
+                    "p1_ac_volts", "p1_ac_amps", "p1_ac_watts", "p1_ac_pf",
+                    "p2_dc_volts", "p2_dc_amps", "p2_dc_watts",
+                    "efficiency_pct", "loss_watts"
+                ])
+                self.log_file.flush()
+                self.is_logging = True
+                self.log_records_count = 0
+                self.btn_log.config(text="⏹ Stop CSV Recording")
+                self.log_status_var.set(f"Logging to: {filepath.split('/')[-1].split(chr(92))[-1]}")
+                self.log_records_var.set("0 rows recorded")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to start CSV log: {e}")
+        else:
+            self.is_logging = False
+            if self.log_file:
+                try:
+                    self.log_file.close()
+                except:
+                    pass
+                self.log_file = None
+            self.btn_log.config(text="▶ Start CSV Recording")
+            self.log_status_var.set("CSV Logging: Stopped")
+
+    def _record_csv_row(self):
+        if not self.is_logging or not self.csv_writer:
+            return
+        now = time.time()
+        now_iso = datetime.datetime.now().isoformat()
+        m1 = self.latest_metrics[1]
+        m2 = self.latest_metrics[2]
+        p1 = m1["p"] or 0.0
+        p2 = m2["p"] or 0.0
+        eff = round((p2 / p1) * 100.0, 3) if p1 > 0 else ""
+        loss = round(p1 - p2, 3) if p1 > 0 else ""
+
+        try:
+            self.csv_writer.writerow([
+                now_iso, f"{now:.3f}",
+                m1["v"], m1["i"], m1["p"], m1["pf"],
+                m2["v"], m2["i"], m2["p"],
+                eff, loss
+            ])
+            self.log_records_count += 1
+            if self.log_records_count % 5 == 0:
+                self.log_file.flush()
+                self.log_records_var.set(f"{self.log_records_count} rows recorded")
+        except Exception:
+            pass
+
+    def export_snapshot_csv(self):
+        filepath = filedialog.asksaveasfilename(
+            title="Save Snapshot to CSV",
+            defaultextension=".csv",
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+        )
+        if not filepath:
+            return
+        try:
+            now_iso = datetime.datetime.now().isoformat()
+            m1 = self.latest_metrics[1]
+            m2 = self.latest_metrics[2]
+            p1 = m1["p"] or 0.0
+            p2 = m2["p"] or 0.0
+            eff = round((p2 / p1) * 100.0, 3) if p1 > 0 else ""
+            loss = round(p1 - p2, 3) if p1 > 0 else ""
+
+            with open(filepath, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["metric", "value", "unit"])
+                w.writerow(["timestamp", now_iso, "ISO-8601"])
+                w.writerow(["p1_ac_voltage", m1["v"], "V"])
+                w.writerow(["p1_ac_current", m1["i"], "A"])
+                w.writerow(["p1_ac_power", m1["p"], "W"])
+                w.writerow(["p1_ac_pf", m1["pf"], ""])
+                w.writerow(["p2_dc_voltage", m2["v"], "V"])
+                w.writerow(["p2_dc_current", m2["i"], "A"])
+                w.writerow(["p2_dc_power", m2["p"], "W"])
+                w.writerow(["efficiency", eff, "%"])
+                w.writerow(["power_loss", loss, "W"])
+            messagebox.showinfo("Export Complete", f"Snapshot exported to:\n{filepath}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export snapshot: {e}")
 
     def update_charts(self, frame):
         for port_id in [1, 2]:

@@ -1,11 +1,16 @@
-# Serial Power Profiling
+# Serial & Ethernet Power Profiling
 
-Node.js tools for serial power meters that make it easy to:
-- Monitor power consumption in real-time via a web interface
-- Export power profiles to [Firefox Profiler](https://profiler.firefox.com) for detailed analysis
-- Control devices and run measurements via command line
+Multi-channel instrumentation and profiling suite for precision laboratory power meters (IeS ISW8001, MPM-1010). Designed for characterizing conversion efficiency, power factor, quiescent drain, and dynamic load transients on hardware such as **laboratory AC/DC battery chargers, switched-mode power supplies (SMPS), and DC-DC converters**.
 
-The web interface continuously samples power data and displays live charts with statistics. Power profiles can be exported in Firefox Profiler format, allowing you to correlate power consumption with system activity and performance measurements.
+Supports both native RS-232 serial interfaces and **Ethernet Serial-to-IP gateways (WIZnet WIZ750SR-110, Moxa)** to eliminate USB driver drops in lab testbenches.
+
+### Laboratory Context: AC/DC Battery Charger Characterization
+In a battery charging testbench, two synchronized meters measure the electrical boundaries simultaneously:
+1. **Input Channel (AC Mains)**: Active power ($P_{\text{in}}$ in Watts), AC RMS voltage, AC RMS current, and Power Factor ($\text{PF}$).
+2. **Output Channel (DC Battery Terminal)**: DC output power ($P_{\text{out}}$ in Watts), DC charging voltage, and DC current delivery.
+3. **Live Conversion Metrics**:
+   $$\text{Efficiency } \eta = \left(\frac{P_{\text{out, DC}}}{P_{\text{in, AC}}}\right) \times 100\% \qquad\qquad P_{\text{loss}} = P_{\text{in, AC}} - P_{\text{out, DC}}$$
+All channels are time-synchronized, visualized in real time, and stream directly into structured CSV logs for automated test reporting and battery lifecycle analysis.
 
 ## Supported Devices
 

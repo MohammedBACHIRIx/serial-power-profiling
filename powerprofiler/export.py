@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from . import storage
 
 def export_csv(db_path: str, device_id: int, start_ts: float, end_ts: float, out_path: str):
+    """Export single-device time series samples to CSV."""
     reader = storage.Reader(db_path)
     try:
         samples = reader.samples_in_range(device_id, start_ts, end_ts)
@@ -35,6 +36,68 @@ def export_csv(db_path: str, device_id: int, start_ts: float, end_ts: float, out
                 s.get("v_range", ""),
                 s.get("i_range", ""),
                 s["flags"]
+            ])
+
+
+def export_paired_efficiency_csv(db_path: str, in_device_id: int, out_device_id: int, 
+                                start_ts: float, end_ts: float, out_path: str, tolerance_s: float = 1.0):
+    """Export time-aligned input/output power, efficiency (%), and losses (W) to CSV."""
+    reader = storage.Reader(db_path)
+    try:
+        in_samples = reader.samples_in_range(in_device_id, start_ts, end_ts)
+        out_samples = reader.samples_in_range(out_device_id, start_ts, end_ts)
+    finally:
+        reader.close()
+
+    import datetime
+    out_idx = 0
+    num_out = len(out_samples)
+
+    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow([
+            "timestamp_iso", "timestamp_epoch",
+            "p_in_ac_w", "v_in_ac_v", "i_in_ac_a", "pf_in",
+            "p_out_dc_w", "v_out_dc_v", "i_out_dc_a",
+            "efficiency_pct", "loss_w"
+        ])
+
+        for s_in in in_samples:
+            ts = s_in["ts"]
+            ts_iso = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).isoformat()
+            p_in = s_in.get("power_w")
+
+            # Find closest out_sample in time
+            closest_out = None
+            min_dt = float("inf")
+            while out_idx < num_out:
+                dt = abs(out_samples[out_idx]["ts"] - ts)
+                if dt < min_dt:
+                    min_dt = dt
+                    closest_out = out_samples[out_idx]
+                if out_samples[out_idx]["ts"] > ts + tolerance_s:
+                    break
+                out_idx += 1
+
+            p_out = closest_out.get("power_w") if closest_out and min_dt <= tolerance_s else None
+            v_out = closest_out.get("voltage_v") if closest_out and min_dt <= tolerance_s else ""
+            i_out = closest_out.get("current_a") if closest_out and min_dt <= tolerance_s else ""
+
+            eff = ""
+            loss = ""
+            if p_in is not None and p_out is not None and p_in > 0:
+                eff = round((p_out / p_in) * 100.0, 3)
+                loss = round(p_in - p_out, 3)
+
+            writer.writerow([
+                ts_iso, ts,
+                p_in if p_in is not None else "",
+                s_in.get("voltage_v", ""),
+                s_in.get("current_a", ""),
+                s_in.get("pf", ""),
+                p_out if p_out is not None else "",
+                v_out, i_out,
+                eff, loss
             ])
 
 def _watt_second_to_pico_watt_hour(value: float) -> int:
@@ -209,14 +272,20 @@ def export_firefox_profile(db_path: str, device_id: int, start_ts: float, end_ts
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export DB to CSV or Firefox Profiler JSON")
     parser.add_argument("--db", required=True, help="Path to DB")
-    parser.add_argument("--device-id", required=True, type=int, help="Device ID")
+    parser.add_argument("--device-id", required=True, type=int, help="Device ID (or input device ID for efficiency-csv)")
+    parser.add_argument("--pair-device-id", type=int, help="Output device ID (required for efficiency-csv)")
     parser.add_argument("--out", required=True, help="Output path")
-    parser.add_argument("--format", required=True, choices=["csv", "profile"], help="Export format")
+    parser.add_argument("--format", required=True, choices=["csv", "profile", "efficiency-csv"], help="Export format")
     parser.add_argument("--start", type=float, default=0.0, help="Start timestamp")
     parser.add_argument("--end", type=float, default=2e9, help="End timestamp")
     args = parser.parse_args()
     
     if args.format == "csv":
         export_csv(args.db, args.device_id, args.start, args.end, args.out)
+    elif args.format == "efficiency-csv":
+        if not args.pair_device_id:
+            print("Error: --pair-device-id is required when --format is efficiency-csv")
+            exit(1)
+        export_paired_efficiency_csv(args.db, args.device_id, args.pair_device_id, args.start, args.end, args.out)
     else:
         export_firefox_profile(args.db, args.device_id, args.start, args.end, args.out)
