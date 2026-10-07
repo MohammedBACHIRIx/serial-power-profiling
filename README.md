@@ -238,3 +238,46 @@ The `powerprofiler` package provides an industrial, decoupled architecture for h
    ```bash
    python -m powerprofiler.gui.app --config config/devices.wiznet.example.json
    ```
+
+---
+
+## Graphical User Interface (GUI) Guide
+
+The repository includes graphical interfaces tailored for real-time monitoring and charger testbench workflows:
+
+### 1. Dual-Port Analyzer GUI (`dual_wattmeter_gui.py`)
+
+Specifically built for paired AC-Input / DC-Output characterization of battery chargers and power converters.
+
+#### Main Features:
+* **Real-Time Efficiency Banner**:
+  * Large, high-visibility status header displaying:
+    $$\text{Efficiency } \eta = \left(\frac{P_{\text{out}}}{P_{\text{in}}}\right) \times 100\% \qquad\text{and}\qquad P_{\text{loss}} = P_{\text{in}} - P_{\text{out}}$$
+  * Updates live with every incoming measurement cycle (~2.1 Hz).
+* **Dual Channel Input Panels**:
+  * **Channel 1 (AC Mains Input)**: Configured for $P_{\text{in}}$, RMS AC Voltage ($V$), RMS AC Current ($A$), and Power Factor ($\text{PF}$).
+  * **Channel 2 (DC Battery Output)**: Configured for $P_{\text{out}}$, DC terminal Voltage ($V$), and DC Charging Current ($A$).
+* **Mixed Connectivity per Port (Serial COM or Ethernet TCP)**:
+  * Each channel has an independent dropdown to select:
+    * `SERIAL (COM)`: Select any enumerated COM port (or click **↻** to rescan USB ports dynamically).
+    * `ETHERNET (TCP)`: Enter the IP and port of the **WIZnet WIZ750SR-110** module (e.g. `192.168.1.150:5000`).
+    * `SIMULATOR-P1 / P2`: Built-in mock hardware to test charting and efficiency without physical hardware attached.
+* **Live Matplotlib Strip-Charts**:
+  * Independent real-time strip charts auto-scale to display instantaneous power draw and dynamic charge step responses.
+* **Data Export & Logging**:
+  * **`▶ Start CSV Recording`**: Prompts for a filename and streams synchronized records directly to disk:
+    `timestamp_iso, timestamp_epoch, p1_ac_volts, p1_ac_amps, p1_ac_watts, p1_ac_pf, p2_dc_volts, p2_dc_amps, p2_dc_watts, efficiency_pct, loss_watts`
+  * **`💾 Save Snapshot to CSV`**: Exports an immediate tabular record of current operating metrics and conversion parameters.
+* **Direct Instrument Controls**:
+  * Switch meter measurement modes (`WATT`, `VAR`, `VOLT`, `AMP`, `PWF`) and toggles (`AutoRange` vs `Manual`) directly from the software without touching physical front panel buttons.
+
+---
+
+### 2. Multi-Meter Dashboard (`powerprofiler/gui/app.py`)
+
+For multi-stage testbenches or multi-channel setups monitoring up to 8 wattmeters simultaneously:
+* **High-Performance Blitting**: Uses Matplotlib canvas blitting to render up to 8 real-time graphs with minimal CPU overhead.
+* **Spike Filtering Toggle**: Removes physical relay range-change transient spikes (known ISW8001 switching behavior).
+* **Threshold Alerts**: Visual alerts with acknowledgement when voltage, power, or stale data limits are breached.
+* **Paired System Efficiency**: Automatically discovers configured `input` and `output` pairings and displays conversion metrics across stages.
+
