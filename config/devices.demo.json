@@ -1,0 +1,29 @@
+{
+  "db_path": "%LOCALAPPDATA%/powerprofiler/powerprofiler-demo.db",
+  "sample_batch_ms": 250,
+  "devices": [
+    {
+      "name": "DEMO-PSU-IN",
+      "role": "input",
+      "pair": "DEMO-LOAD-OUT",
+      "model": "Demo",
+      "init": { "function": "WATT", "auto_mode": true, "autorange": true },
+      "alerts": { "power_w_max": 2000, "voltage_v_max": 260, "voltage_v_min": 180, "stale_seconds": 5 }
+    },
+    {
+      "name": "DEMO-LOAD-OUT",
+      "role": "output",
+      "pair": "DEMO-PSU-IN",
+      "model": "Demo",
+      "init": { "function": "WATT", "auto_mode": true, "autorange": true },
+      "alerts": { "power_w_max": 2000, "voltage_v_max": 260, "voltage_v_min": 180, "stale_seconds": 5 }
+    },
+    {
+      "name": "DEMO-AUX",
+      "role": "standalone",
+      "model": "Demo",
+      "init": { "function": "WATT", "auto_mode": true, "autorange": true },
+      "alerts": { "power_w_max": 2000, "stale_seconds": 5 }
+    }
+  ]
+}

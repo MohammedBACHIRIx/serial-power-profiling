@@ -9,7 +9,7 @@ TEXT_DIM = '#A0A0A0'
 ACCENT_GREEN = '#00FF9D'
 ACCENT_BLUE = '#00B8FF'
 ACCENT_YELLOW = '#FFD700'
-ACCENT_RED = '#FF3366'
+ACCENT_RED = '#FF6B81'  # WCAG AA (>=4.5:1) on both BG and PANEL; alert text must stay legible
 CHART_BG = '#1E1E24'
 
 def setup_styles():

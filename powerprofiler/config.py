@@ -22,6 +22,9 @@ class DeviceConfig:
     hwid_hint: str = None
     baud: int = 9600
     model: str = "ISW8001"          # or "Demo"
+    transport: str = "serial"       # "serial", "tcp" (e.g. WIZ750SR), or "demo"
+    tcp_host: str = None
+    tcp_port: int = 5000
     function: str = "WATT"
     auto_mode: bool = True
     autorange: bool = True
@@ -39,6 +42,16 @@ def _as_device(d):
     if "name" not in d or not d["name"]:
         raise ConfigError("every device needs a non-empty 'name'")
     init = d.get("init", {})
+    model = d.get("model", "ISW8001")
+    transport = d.get("transport")
+    if not transport:
+        if model == "Demo":
+            transport = "demo"
+        elif d.get("tcp_host"):
+            transport = "tcp"
+        else:
+            transport = "serial"
+
     return DeviceConfig(
         name=d["name"],
         role=d.get("role", "standalone"),
@@ -46,10 +59,13 @@ def _as_device(d):
         port=d.get("port"),
         hwid_hint=d.get("hwid_hint"),
         baud=int(d.get("baud", 9600)),
-        model=d.get("model", "ISW8001"),
+        model=model,
+        transport=transport,
+        tcp_host=d.get("tcp_host"),
+        tcp_port=int(d.get("tcp_port", 5000)),
         function=init.get("function", "WATT"),
         auto_mode=bool(init.get("auto_mode", True)),
-        autorange=bool(init.get("autorange", True)),
+        autorange=bool(init.get("auto_range", init.get("autorange", True))),
         alerts=d.get("alerts", {}),
     )
 
@@ -67,8 +83,10 @@ def load(path):
         if d.name in seen:
             raise ConfigError("duplicate device name: %s" % d.name)
         seen.add(d.name)
-        if d.model != "Demo" and not d.port:
-            raise ConfigError("device %s needs a 'port' (or model 'Demo')" % d.name)
+        if d.transport == "serial" and not d.port:
+            raise ConfigError("serial device %s needs a 'port'" % d.name)
+        elif d.transport == "tcp" and not d.tcp_host:
+            raise ConfigError("tcp device %s needs 'tcp_host'" % d.name)
     if not devices:
         raise ConfigError("config has no devices")
 
@@ -87,6 +105,7 @@ def save(cfg, path):
         "devices": [{
             "name": d.name, "role": d.role, "pair": d.pair, "port": d.port,
             "hwid_hint": d.hwid_hint, "baud": d.baud, "model": d.model,
+            "transport": d.transport, "tcp_host": d.tcp_host, "tcp_port": d.tcp_port,
             "init": {"function": d.function, "auto_mode": d.auto_mode,
                      "autorange": d.autorange},
             "alerts": d.alerts,

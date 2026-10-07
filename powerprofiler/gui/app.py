@@ -50,7 +50,15 @@ class PowerProfilerApp:
         
         self.panels = {}
         self.active_alert = None
+        self.latest_power = {d_id: 0.0 for d_id in self.device_ids}
         
+        # Discover paired input/output relationships for efficiency calculation
+        self.pairs = []
+        name_to_id = {d["name"]: d["id"] for d in self.devices}
+        for d in self.devices:
+            if d.get("role") == "input" and d.get("pair") in name_to_id:
+                self.pairs.append((d["id"], name_to_id[d["pair"]], d["name"], d["pair"]))
+
         self._build_ui()
         
         self.poll_thread = threading.Thread(target=self._db_poll_worker, daemon=True)
@@ -69,6 +77,13 @@ class PowerProfilerApp:
                              bg=theme.BG_COLOR, fg=theme.TEXT_COLOR, selectcolor=theme.PANEL_BG)
         chk.pack(side=tk.LEFT, padx=5)
         
+        self.efficiency_var = tk.StringVar(value="")
+        self.eff_label = tk.Label(top_bar, textvariable=self.efficiency_var,
+                                  bg=theme.PANEL_BG, fg=theme.ACCENT_YELLOW,
+                                  font=("Consolas", 12, "bold"), padx=10, pady=2)
+        if self.pairs:
+            self.eff_label.pack(side=tk.LEFT, padx=15)
+
         self.alert_frame = ttk.Frame(top_bar, style='Panel.TFrame')
         self.alert_label = tk.Label(self.alert_frame, text="", bg=theme.PANEL_BG, fg=theme.ACCENT_RED, font=("Arial", 12, "bold"))
         self.alert_label.pack(side=tk.LEFT, padx=5)
@@ -103,6 +118,20 @@ class PowerProfilerApp:
                 if i >= len(self.devices):
                     self.chart_mgr.toggle_visibility(i, False)
                     
+    def _update_efficiency_banner(self):
+        if not self.pairs:
+            return
+        parts = []
+        for in_id, out_id, in_name, out_name in self.pairs:
+            p_in = self.latest_power.get(in_id, 0.0)
+            p_out = self.latest_power.get(out_id, 0.0)
+            if p_in > 0:
+                eff = (p_out / p_in) * 100.0
+                parts.append(f"{out_name}/{in_name}: {eff:.1f}% ({p_out:.1f}W / {p_in:.1f}W)")
+            else:
+                parts.append(f"{out_name}/{in_name}: ---%")
+        self.efficiency_var.set(" | ".join(parts))
+
     def _ack_alert(self):
         if self.active_alert:
             storage.ack_alert(self.db_path, self.active_alert["id"])
@@ -172,8 +201,13 @@ class PowerProfilerApp:
                 
             if last_valid:
                 self.last_ts[d_id] = last_valid["ts"]
+                pw = last_valid.get("power_w")
+                if pw is not None:
+                    self.latest_power[d_id] = pw
+                    self._update_efficiency_banner()
+
                 self.panels[d_id].update_values(
-                    last_valid.get("power_w"),
+                    pw,
                     last_valid.get("voltage_v"),
                     last_valid.get("current_a"),
                     last_valid.get("pf"),

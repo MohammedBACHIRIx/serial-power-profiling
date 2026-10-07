@@ -18,8 +18,10 @@ from . import alerts, config as config_mod, demo, device, storage, supervisor
 
 
 def _transport_factory(dcfg):
-    if dcfg.model == "Demo":
+    if dcfg.transport == "demo" or dcfg.model == "Demo":
         return demo.DemoTransport(name=dcfg.name)
+    if dcfg.transport == "tcp" or dcfg.tcp_host:
+        return device.TcpTransport(dcfg.tcp_host, port=dcfg.tcp_port)
     return device.SerialTransport(dcfg.port, baud=dcfg.baud, hwid_hint=dcfg.hwid_hint)
 
 

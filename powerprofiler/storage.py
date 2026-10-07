@@ -162,6 +162,9 @@ class WriterLock:
         self._fh = None
 
     def acquire(self):
+        # The lock is opened before the Writer creates the DB, so on a fresh
+        # install the parent directory may not exist yet. Create it first.
+        os.makedirs(os.path.dirname(self.lock_path), exist_ok=True)
         self._fh = open(self.lock_path, "a+")
         try:
             self._fh.seek(0)

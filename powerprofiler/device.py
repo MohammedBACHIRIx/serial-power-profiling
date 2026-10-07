@@ -83,6 +83,51 @@ class SerialTransport:
         return b""
 
 
+class TcpTransport:
+    """Socket-based transport for Ethernet-to-Serial modules (e.g. WIZ750SR, Moxa, ESP-link)."""
+
+    def __init__(self, host, port=5000, timeout=3.0):
+        self.host = host
+        self.port = int(port)
+        self.timeout = timeout
+        self._sock = None
+        self.is_open = False
+
+    def resolve_port(self):
+        return f"{self.host}:{self.port}"
+
+    def open(self):
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
+        sock.connect((self.host, self.port))
+        sock.settimeout(0.02)
+        self._sock = sock
+        self.is_open = True
+
+    def close(self):
+        try:
+            if self._sock:
+                self._sock.close()
+        finally:
+            self._sock = None
+            self.is_open = False
+
+    def write(self, data):
+        if self._sock and self.is_open:
+            self._sock.sendall(data)
+
+    def read(self):
+        import socket
+        if not (self._sock and self.is_open):
+            return b""
+        try:
+            return self._sock.recv(1024)
+        except (socket.timeout, BlockingIOError):
+            time.sleep(0.01)
+            return b""
+
+
 class DeviceWorker(threading.Thread):
     def __init__(self, device_id, name, transport, out_queue, cmd_queue,
                  init_commands=("WATT", "MA1"), stale_seconds=3.0):

@@ -199,3 +199,37 @@ The device supports 1200 or 9600 baud. If you changed the device baud rate:
 
 - [ISW8001 Protocol](docs/ISW8001-PROTOCOL.md)
 - [MPM-1010 Protocol](docs/MPM1010-PROTOCOL.md)
+
+---
+
+## Python PowerProfiler Architecture (Multi-Device & Extensible)
+
+The `powerprofiler` package provides an industrial, decoupled architecture for high-reliability lab testbenches and long running profiling:
+
+```
+[Meters / Transports]            [Supervisor Engine]            [Storage / WAL]          [Viewers / UI]
+ ISW8001 (RS232/COM)   ───►  Worker Thread (Isolated) ───► SQLite WAL Database ───► Multi-Device Live GUI
+ WIZ750SR (TCP/IP)     ───►  Worker Thread (Isolated) ───► (Single-Writer Lock)───► Live Efficiency Banner
+ Demo Simulator        ───►  Worker Thread (Isolated) ───►                    ───► CSV & Profiler Export
+```
+
+### Key Architectural Strengths:
+1. **Transport Abstraction**: Plug-and-play transports (`SerialTransport`, `TcpTransport`, `DemoTransport`). Easily extend to Modbus, VISA, or Bluetooth.
+2. **Ethernet Serial-to-IP (WIZ750SR / Moxa)**: Direct native socket communication eliminates USB-serial driver instabilities (e.g. Prolific PL2303).
+3. **Decoupled Producer-Consumer**: Workers run isolated threads with auto-reconnect and backoff. Data is stored in SQLite WAL mode so headless loggers and multiple GUI readers never lock each other.
+4. **Automated Pairing & Live Efficiency**: Configure `role: "input"` and `role: "output"` with `pair: "OTHER-DEV"`; the system automatically computes and displays real-time conversion efficiency.
+
+### Running the Python Suite
+
+1. **Standalone Dual-Port Interactive GUI**:
+   ```bash
+   python dual_wattmeter_gui.py
+   ```
+2. **Multi-Meter Headless Logger**:
+   ```bash
+   python -m powerprofiler.logger_app --config config/devices.wiznet.example.json
+   ```
+3. **Multi-Meter Live Dashboard (with Charts & Efficiency)**:
+   ```bash
+   python -m powerprofiler.gui.app --config config/devices.wiznet.example.json
+   ```
