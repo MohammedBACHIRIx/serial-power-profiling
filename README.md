@@ -224,20 +224,24 @@ The `powerprofiler` package provides an industrial, decoupled architecture for h
 3. **Decoupled Producer-Consumer**: Workers run isolated threads with auto-reconnect and backoff. Data is stored in SQLite WAL mode so headless loggers and multiple GUI readers never lock each other.
 4. **Automated Pairing & Live Efficiency**: Configure `role: "input"` and `role: "output"` with `pair: "OTHER-DEV"`; the system automatically computes and displays real-time conversion efficiency.
 
-### Running the Python Suite
+### Running the Python Suite & Quick Start
 
-1. **Standalone Dual-Port Interactive GUI**:
+1. **One-Click Desktop Executable (No Terminal Needed)**:
+   * Double-click **`ChargerPowerProfiler`** directly from your **Windows Desktop** (or run `dist/ChargerPowerProfiler/ChargerPowerProfiler.exe`).
+   * Alternatively, double-click **`Run-Charger-Profiler.bat`** in the project root.
+2. **Interactive GUI from Source**:
    ```bash
    python dual_wattmeter_gui.py
    ```
-2. **Multi-Meter Headless Logger**:
+3. **Multi-Meter Headless Logger**:
    ```bash
    python -m powerprofiler.logger_app --config config/devices.wiznet.example.json
    ```
-3. **Multi-Meter Live Dashboard (with Charts & Efficiency)**:
+4. **Multi-Meter Live Dashboard (with Charts & Efficiency)**:
    ```bash
    python -m powerprofiler.gui.app --config config/devices.wiznet.example.json
    ```
+
 
 ---
 
