@@ -253,6 +253,8 @@ The repository includes graphical interfaces tailored for real-time monitoring a
 
 Specifically built for paired AC-Input / DC-Output characterization of battery chargers and power converters.
 
+![AC/DC Charger Efficiency & Dual Wattmeter GUI](docs/images/gui_dual_wattmeter.png)
+
 #### Main Features:
 * **Real-Time Efficiency Banner**:
   * Large, high-visibility status header displaying:
