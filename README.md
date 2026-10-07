@@ -1,16 +1,20 @@
-# Serial & Ethernet Power Profiling
+# Universal Dual-Channel & Multi-Meter Power Profiling
 
-Multi-channel instrumentation and profiling suite for precision laboratory power meters (IeS ISW8001, MPM-1010). Designed for characterizing conversion efficiency, power factor, quiescent drain, and dynamic load transients on hardware such as **laboratory AC/DC battery chargers, switched-mode power supplies (SMPS), and DC-DC converters**.
+Multi-channel instrumentation, measurement, and profiling suite for precision laboratory power meters (IeS ISW8001, MPM-1010). Designed for characterizing conversion efficiency, power transfer ratios, power factor, quiescent drain, and dynamic electrical transients across any dual-channel or multi-stage equipment:
+* **AC/DC Power Supplies & Battery Chargers**
+* **DC-DC Buck/Boost Converters & Inverters**
+* **Industrial Transformers, VFDs, & Motor Drives**
+* **Server racks, appliances, and general benchtop DUTs**
 
 Supports both native RS-232 serial interfaces and **Ethernet Serial-to-IP gateways (WIZnet WIZ750SR-110, Moxa)** to eliminate USB driver drops in lab testbenches.
 
-### Laboratory Context: AC/DC Battery Charger Characterization
-In a battery charging testbench, two synchronized meters measure the electrical boundaries simultaneously:
-1. **Input Channel (AC Mains)**: Active power ($P_{\text{in}}$ in Watts), AC RMS voltage, AC RMS current, and Power Factor ($\text{PF}$).
-2. **Output Channel (DC Battery Terminal)**: DC output power ($P_{\text{out}}$ in Watts), DC charging voltage, and DC current delivery.
-3. **Live Conversion Metrics**:
-   $$\text{Efficiency } \eta = \left(\frac{P_{\text{out, DC}}}{P_{\text{in, AC}}}\right) \times 100\% \qquad\qquad P_{\text{loss}} = P_{\text{in, AC}} - P_{\text{out, DC}}$$
-All channels are time-synchronized, visualized in real time, and stream directly into structured CSV logs for automated test reporting and battery lifecycle analysis.
+### Universal Dual-Port Architecture:
+The two synchronized measurement channels evaluate any electrical boundaries simultaneously:
+1. **Channel 1 (Input / Source)**: Active power ($P_1$ in Watts), RMS voltage, current, and Power Factor ($\text{PF}_1$).
+2. **Channel 2 (Output / Load)**: Active power ($P_2$ in Watts), terminal voltage, current, and Power Factor ($\text{PF}_2$).
+3. **Live Conversion & Ratio Metrics**:
+   $$\text{Efficiency / Ratio } \eta = \left(\frac{P_2}{P_1}\right) \times 100\% \qquad\qquad \Delta P = P_1 - P_2$$
+All channels are time-synchronized, visualized in real time, and stream directly into structured CSV logs for automated test reporting and performance verification.
 
 ## Supported Devices
 
@@ -224,11 +228,11 @@ The `powerprofiler` package provides an industrial, decoupled architecture for h
 3. **Decoupled Producer-Consumer**: Workers run isolated threads with auto-reconnect and backoff. Data is stored in SQLite WAL mode so headless loggers and multiple GUI readers never lock each other.
 4. **Automated Pairing & Live Efficiency**: Configure `role: "input"` and `role: "output"` with `pair: "OTHER-DEV"`; the system automatically computes and displays real-time conversion efficiency.
 
-### Running the Python Suite & Quick Start
+#### Running the Python Suite & Quick Start
 
 1. **One-Click Desktop Executable (No Terminal Needed)**:
-   * Double-click **`ChargerPowerProfiler`** directly from your **Windows Desktop** (or run `dist/ChargerPowerProfiler/ChargerPowerProfiler.exe`).
-   * Alternatively, double-click **`Run-Charger-Profiler.bat`** in the project root.
+   * Double-click **`DualWattmeterProfiler`** directly from your **Windows Desktop** (or run `dist/DualWattmeterProfiler/DualWattmeterProfiler.exe`).
+   * Alternatively, double-click **`Run-Power-Profiler.bat`** in the project root.
 2. **Interactive GUI from Source**:
    ```bash
    python dual_wattmeter_gui.py
@@ -242,37 +246,36 @@ The `powerprofiler` package provides an industrial, decoupled architecture for h
    python -m powerprofiler.gui.app --config config/devices.wiznet.example.json
    ```
 
-
 ---
 
 ## Graphical User Interface (GUI) Guide
 
-The repository includes graphical interfaces tailored for real-time monitoring and charger testbench workflows:
+The repository includes graphical interfaces tailored for real-time monitoring and lab characterization workflows:
 
-### 1. Dual-Port Analyzer GUI (`dual_wattmeter_gui.py`)
+### 1. Universal Dual-Port Analyzer GUI (`dual_wattmeter_gui.py`)
 
-Specifically built for paired AC-Input / DC-Output characterization of battery chargers and power converters.
+Designed for universal dual-channel power comparison, conversion efficiency, ratio tracking, and delta analysis.
 
-![AC/DC Charger Efficiency & Dual Wattmeter GUI](docs/images/gui_dual_wattmeter.png)
+![Universal Dual Wattmeter & Power Profiler GUI](docs/images/gui_dual_wattmeter.png)
 
 #### Main Features:
-* **Real-Time Efficiency Banner**:
+* **Real-Time Ratio & Efficiency Banner**:
   * Large, high-visibility status header displaying:
-    $$\text{Efficiency } \eta = \left(\frac{P_{\text{out}}}{P_{\text{in}}}\right) \times 100\% \qquad\text{and}\qquad P_{\text{loss}} = P_{\text{in}} - P_{\text{out}}$$
+    $$\text{Ratio / Efficiency } \eta = \left(\frac{P_2}{P_1}\right) \times 100\% \qquad\text{and}\qquad \Delta P = P_1 - P_2$$
   * Updates live with every incoming measurement cycle (~2.1 Hz).
-* **Dual Channel Input Panels**:
-  * **Channel 1 (AC Mains Input)**: Configured for $P_{\text{in}}$, RMS AC Voltage ($V$), RMS AC Current ($A$), and Power Factor ($\text{PF}$).
-  * **Channel 2 (DC Battery Output)**: Configured for $P_{\text{out}}$, DC terminal Voltage ($V$), and DC Charging Current ($A$).
+* **Universal Dual Channel Input Panels**:
+  * **Channel 1 (Input / Meter 1)**: Displays $P_1$, RMS Voltage ($V$), RMS Current ($A$), and Power Factor ($\text{PF}$).
+  * **Channel 2 (Output / Meter 2)**: Displays $P_2$, Terminal Voltage ($V$), Current ($A$), and Power Factor ($\text{PF}$).
 * **Mixed Connectivity per Port (Serial COM or Ethernet TCP)**:
   * Each channel has an independent dropdown to select:
     * `SERIAL (COM)`: Select any enumerated COM port (or click **↻** to rescan USB ports dynamically).
     * `ETHERNET (TCP)`: Enter the IP and port of the **WIZnet WIZ750SR-110** module (e.g. `192.168.1.150:5000`).
     * `SIMULATOR-P1 / P2`: Built-in mock hardware to test charting and efficiency without physical hardware attached.
 * **Live Matplotlib Strip-Charts**:
-  * Independent real-time strip charts auto-scale to display instantaneous power draw and dynamic charge step responses.
+  * Independent real-time strip charts auto-scale to display instantaneous power draw and dynamic electrical transients.
 * **Data Export & Logging**:
   * **`▶ Start CSV Recording`**: Prompts for a filename and streams synchronized records directly to disk:
-    `timestamp_iso, timestamp_epoch, p1_ac_volts, p1_ac_amps, p1_ac_watts, p1_ac_pf, p2_dc_volts, p2_dc_amps, p2_dc_watts, efficiency_pct, loss_watts`
+    `timestamp_iso, timestamp_epoch, ch1_volts, ch1_amps, ch1_watts, ch1_pf, ch2_volts, ch2_amps, ch2_watts, ch2_pf, ratio_pct, delta_watts`
   * **`💾 Save Snapshot to CSV`**: Exports an immediate tabular record of current operating metrics and conversion parameters.
 * **Direct Instrument Controls**:
   * Switch meter measurement modes (`WATT`, `VAR`, `VOLT`, `AMP`, `PWF`) and toggles (`AutoRange` vs `Manual`) directly from the software without touching physical front panel buttons.

@@ -204,21 +204,21 @@ class ConnectionHandler:
 class DualPortGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("AC/DC Charger Power & Efficiency Analyzer (ISW8001 Dual Profiler)")
+        self.root.title("Universal Dual Wattmeter & Power Profiler (Serial & Ethernet WIZ750SR)")
         self.root.geometry("1160x860")
         
         style = ttk.Style()
         style.theme_use('clam')
         
-        # --- Top Efficiency & Context Banner ---
+        # --- Top Efficiency & Ratio Banner ---
         eff_frame = tk.Frame(root, bg="#2C3E50", bd=5, relief=tk.RAISED)
         eff_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
 
-        title_label = tk.Label(eff_frame, text="Laboratory AC/DC Battery Charger Efficiency Testbench",
+        title_label = tk.Label(eff_frame, text="Universal Dual-Channel Power & Conversion Profiler",
                                font=("Arial", 11, "bold"), fg="#BDC3C7", bg="#2C3E50")
         title_label.pack(pady=(4, 0))
         
-        self.var_efficiency = tk.StringVar(value="System Efficiency (P2 DC-Out / P1 AC-In) : --- %")
+        self.var_efficiency = tk.StringVar(value="Power Ratio / Efficiency (Port 2 / Port 1) : --- %")
         tk.Label(eff_frame, textvariable=self.var_efficiency, 
                  font=("Consolas", 18, "bold"), fg="#F1C40F", bg="#2C3E50", pady=4).pack()
 
@@ -248,10 +248,10 @@ class DualPortGUI:
         main_frame = tk.Frame(root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        self.frame1 = tk.LabelFrame(main_frame, text="Port 1: AC Mains Input (P_in)", font=("Arial", 12, "bold"), padx=10, pady=10)
+        self.frame1 = tk.LabelFrame(main_frame, text="Channel 1 (Input / Meter 1)", font=("Arial", 12, "bold"), padx=10, pady=10)
         self.frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
-        self.frame2 = tk.LabelFrame(main_frame, text="Port 2: DC Charger Output (P_out)", font=("Arial", 12, "bold"), padx=10, pady=10)
+        self.frame2 = tk.LabelFrame(main_frame, text="Channel 2 (Output / Meter 2)", font=("Arial", 12, "bold"), padx=10, pady=10)
         self.frame2.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
         self.handlers = {1: None, 2: None}
@@ -510,17 +510,17 @@ class DualPortGUI:
         
         if p1 > 0 and p2 >= 0:
             eff = (p2 / p1) * 100.0
-            loss = p1 - p2
+            diff = p1 - p2
             self.var_efficiency.set(
-                f"Charger Efficiency: {eff:.2f}%  |  Losses: {loss:.2f}W  (P_in AC: {p1:.2f}W ➔ P_out DC: {p2:.2f}W)"
+                f"Conversion Ratio / Efficiency: {eff:.2f}%  |  Delta: {diff:.2f}W  (Channel 1: {p1:.2f}W ➔ Channel 2: {p2:.2f}W)"
             )
         else:
-            self.var_efficiency.set("Charger Efficiency: ---%  (Waiting for P_in and P_out measurements)")
+            self.var_efficiency.set("Conversion Ratio: ---%  (Waiting for Channel 1 and Channel 2 power readings)")
 
     def toggle_logging(self):
         if not self.is_logging:
             timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            default_name = f"charger_test_{timestamp_str}.csv"
+            default_name = f"power_profiler_{timestamp_str}.csv"
             filepath = filedialog.asksaveasfilename(
                 title="Select CSV Log File",
                 initialfile=default_name,
@@ -534,9 +534,9 @@ class DualPortGUI:
                 self.csv_writer = csv.writer(self.log_file)
                 self.csv_writer.writerow([
                     "timestamp_iso", "timestamp_epoch",
-                    "p1_ac_volts", "p1_ac_amps", "p1_ac_watts", "p1_ac_pf",
-                    "p2_dc_volts", "p2_dc_amps", "p2_dc_watts",
-                    "efficiency_pct", "loss_watts"
+                    "ch1_volts", "ch1_amps", "ch1_watts", "ch1_pf",
+                    "ch2_volts", "ch2_amps", "ch2_watts", "ch2_pf",
+                    "ratio_pct", "delta_watts"
                 ])
                 self.log_file.flush()
                 self.is_logging = True
@@ -567,14 +567,14 @@ class DualPortGUI:
         p1 = m1["p"] or 0.0
         p2 = m2["p"] or 0.0
         eff = round((p2 / p1) * 100.0, 3) if p1 > 0 else ""
-        loss = round(p1 - p2, 3) if p1 > 0 else ""
+        diff = round(p1 - p2, 3) if p1 > 0 else ""
 
         try:
             self.csv_writer.writerow([
                 now_iso, f"{now:.3f}",
                 m1["v"], m1["i"], m1["p"], m1["pf"],
-                m2["v"], m2["i"], m2["p"],
-                eff, loss
+                m2["v"], m2["i"], m2["p"], m2["pf"],
+                eff, diff
             ])
             self.log_records_count += 1
             if self.log_records_count % 5 == 0:
@@ -598,21 +598,22 @@ class DualPortGUI:
             p1 = m1["p"] or 0.0
             p2 = m2["p"] or 0.0
             eff = round((p2 / p1) * 100.0, 3) if p1 > 0 else ""
-            loss = round(p1 - p2, 3) if p1 > 0 else ""
+            diff = round(p1 - p2, 3) if p1 > 0 else ""
 
             with open(filepath, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
                 w.writerow(["metric", "value", "unit"])
                 w.writerow(["timestamp", now_iso, "ISO-8601"])
-                w.writerow(["p1_ac_voltage", m1["v"], "V"])
-                w.writerow(["p1_ac_current", m1["i"], "A"])
-                w.writerow(["p1_ac_power", m1["p"], "W"])
-                w.writerow(["p1_ac_pf", m1["pf"], ""])
-                w.writerow(["p2_dc_voltage", m2["v"], "V"])
-                w.writerow(["p2_dc_current", m2["i"], "A"])
-                w.writerow(["p2_dc_power", m2["p"], "W"])
-                w.writerow(["efficiency", eff, "%"])
-                w.writerow(["power_loss", loss, "W"])
+                w.writerow(["ch1_voltage", m1["v"], "V"])
+                w.writerow(["ch1_current", m1["i"], "A"])
+                w.writerow(["ch1_power", m1["p"], "W"])
+                w.writerow(["ch1_pf", m1["pf"], ""])
+                w.writerow(["ch2_voltage", m2["v"], "V"])
+                w.writerow(["ch2_current", m2["i"], "A"])
+                w.writerow(["ch2_power", m2["p"], "W"])
+                w.writerow(["ch2_pf", m2["pf"], ""])
+                w.writerow(["ratio_pct", eff, "%"])
+                w.writerow(["delta_power", diff, "W"])
             messagebox.showinfo("Export Complete", f"Snapshot exported to:\n{filepath}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export snapshot: {e}")
